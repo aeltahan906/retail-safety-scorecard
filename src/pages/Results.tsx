@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -7,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { ShieldCheck, CheckCircle, X, ArrowLeft, Download, AlertTriangle, Loader2 } from 'lucide-react';
-import { AssessmentWithQuestions, AssessmentResult } from '@/types/database';
+import { AssessmentWithQuestions, AssessmentResult, QuestionWithImages } from '@/types/database';
 
 const getScoreColor = (score: number) => {
   if (score >= 90) return "text-green-600";
@@ -77,27 +76,11 @@ const Results = () => {
   };
   
   if (!user || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-      </div>
-    );
+    return null;
   }
   
   if (!assessment || !results) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <p className="text-gray-500">No assessment data available</p>
-          <Button 
-            className="mt-4"
-            onClick={() => navigate('/assessment')}
-          >
-            Go to Assessments
-          </Button>
-        </div>
-      </div>
-    );
+    return null;
   }
   
   return (

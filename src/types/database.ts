@@ -26,6 +26,7 @@ export type AssessmentQuestion = {
   comment: string | null;
   created_at: string;
   updated_at: string;
+  images?: string[]; // Add images property
 };
 
 export type QuestionImage = {
