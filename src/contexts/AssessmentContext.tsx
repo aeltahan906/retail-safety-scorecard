@@ -1,268 +1,195 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Assessment, AssessmentQuestion, AssessmentWithQuestions } from '@/types/database';
 import { v4 as uuidv4 } from 'uuid';
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "./AuthContext";
-import { 
-  Assessment, 
-  AssessmentWithQuestions, 
-  AssessmentQuestion, 
-  QuestionWithImages, 
-  AssessmentResult 
-} from '@/types/database';
+import { toast } from 'sonner';
 
-// Define the standard questions for an assessment
-const standardQuestions = [
-  { number: 1, text: "Are all fire exits clearly marked and unobstructed?" },
-  { number: 2, text: "Is the first aid kit fully stocked and accessible?" },
-  { number: 3, text: "Are all employees trained in emergency procedures?" },
-  { number: 4, text: "Is all safety equipment in working order?" },
-  { number: 5, text: "Are safety data sheets available for all hazardous materials?" },
-  { number: 6, text: "Are all electrical equipment and cords in good condition?" },
-  { number: 7, text: "Is personal protective equipment available and in use where required?" },
-  { number: 8, text: "Are safety policies clearly displayed in the workplace?" },
-  { number: 9, text: "Are waste materials properly disposed of?" },
-  { number: 10, text: "Is the workplace kept clean and organized?" },
-  { number: 11, text: "Are appropriate warning signs in place for hazardous areas?" },
-  { number: 12, text: "Is lighting adequate in all work areas?" },
-  { number: 13, text: "Are walking surfaces free of slip, trip, and fall hazards?" },
-  { number: 14, text: "Are chemicals stored safely and properly labeled?" },
-  { number: 15, text: "Is there a system in place for reporting hazards and incidents?" },
-  { number: 16, text: "Are regular safety inspections conducted?" },
-  { number: 17, text: "Are ventilation systems working properly?" },
-  { number: 18, text: "Is machinery equipped with appropriate guards and safety devices?" },
-  { number: 19, text: "Are noise levels controlled and hearing protection provided where needed?" },
-  { number: 20, text: "Is manual handling training provided and proper equipment available?" }
-];
-
-interface AssessmentContextType {
+// Define context types
+export interface AssessmentContextType {
   currentAssessment: AssessmentWithQuestions | null;
-  savedAssessments: Assessment[];
-  loading: boolean;
-  fetchAssessments: () => Promise<void>;
-  createNewAssessment: (storeName: string) => Promise<void>;
-  loadAssessment: (assessmentId: string) => Promise<void>;
-  updateQuestion: (questionId: string, answer: 'yes' | 'no' | 'n/a' | null, comment: string | null, images: string[]) => Promise<void>;
-  calculateResults: () => AssessmentResult;
-  completeAssessment: () => Promise<void>;
+  isLoading: boolean;
+  createAssessment: (storeName: string) => Promise<string | null>;
+  loadAssessment: (assessmentId: string) => Promise<boolean>;
+  updateQuestion: (questionId: string, answer: 'yes' | 'no' | 'n/a' | null, comment: string, images: string[]) => Promise<boolean>;
+  completeAssessment: () => Promise<boolean>;
+  calculateResults: () => { totalQuestions: number, applicableQuestions: number, yesAnswers: number, percentage: number };
+  uploadImage: (file: File, questionId: string) => Promise<string | null>;
 }
 
+// Create context with default values
 const AssessmentContext = createContext<AssessmentContextType | undefined>(undefined);
 
 export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
   const [currentAssessment, setCurrentAssessment] = useState<AssessmentWithQuestions | null>(null);
-  const [savedAssessments, setSavedAssessments] = useState<Assessment[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Fetch user's saved assessments
-  const fetchAssessments = async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-    
-    setLoading(true);
-    
-    try {
-      const { data: assessments, error } = await supabase
-        .from('assessments')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-        
-      if (error) {
-        throw error;
-      }
-      
-      if (assessments) {
-        setSavedAssessments(assessments);
-      }
-    } catch (error: any) {
-      toast.error(`Error fetching assessments: ${error.message}`);
-      console.error('Error fetching assessments:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [isLoading, setIsLoading] = useState(false);
 
   // Create a new assessment
-  const createNewAssessment = async (storeName: string) => {
-    if (!user) {
-      toast.error('You must be logged in to create an assessment');
-      return;
-    }
-    
+  const createAssessment = async (storeName: string): Promise<string | null> => {
     try {
-      // Insert new assessment
-      const { data: assessment, error: assessmentError } = await supabase
+      setIsLoading(true);
+      
+      // Create new assessment
+      const { data: assessmentData, error: assessmentError } = await supabase
         .from('assessments')
-        .insert([{
-          user_id: user.id,
+        .insert({
           store_name: storeName,
           date: new Date().toISOString(),
-          completed: false
-        }])
+        })
         .select()
         .single();
-        
+
       if (assessmentError) {
-        throw assessmentError;
+        console.error('Error creating assessment:', assessmentError);
+        toast.error('Error creating assessment');
+        return null;
       }
-      
-      if (!assessment) {
-        throw new Error('Failed to create assessment');
-      }
-      
-      // Create questions for the assessment
-      const questionsToInsert = standardQuestions.map(q => ({
-        assessment_id: assessment.id,
-        question_number: q.number,
-        question_text: q.text,
-        answer: null,
-        comment: null
+
+      // Define default questions
+      const questions = [
+        { question_number: 1, question_text: "Is proper PPE worn by all personnel?" },
+        { question_number: 2, question_text: "Are all emergency exits clearly marked?" },
+        { question_number: 3, question_text: "Is fire safety equipment readily accessible?" },
+        { question_number: 4, question_text: "Are walkways clear of obstructions?" },
+        { question_number: 5, question_text: "Are hazardous materials properly stored?" },
+        { question_number: 6, question_text: "Is electrical equipment in good condition?" },
+        { question_number: 7, question_text: "Are safety signs clearly visible?" },
+        { question_number: 8, question_text: "Is first aid equipment available and accessible?" },
+        { question_number: 9, question_text: "Are staff trained in emergency procedures?" },
+        { question_number: 10, question_text: "Is the facility clean and well-maintained?" },
+      ];
+
+      // Create questions for the new assessment
+      const questionsToInsert = questions.map(q => ({
+        assessment_id: assessmentData.id,
+        question_number: q.question_number,
+        question_text: q.question_text,
       }));
-      
-      const { data: questions, error: questionsError } = await supabase
+
+      const { data: questionData, error: questionError } = await supabase
         .from('assessment_questions')
         .insert(questionsToInsert)
         .select();
-        
-      if (questionsError) {
-        throw questionsError;
+
+      if (questionError) {
+        console.error('Error creating questions:', questionError);
+        toast.error('Error creating questions');
+        return null;
       }
-      
-      // Add images array to each question
-      const questionsWithImages: QuestionWithImages[] = questions.map((q: AssessmentQuestion) => ({
-        ...q,
-        images: []
-      }));
-      
-      // Set the current assessment
-      setCurrentAssessment({
-        ...assessment,
-        questions: questionsWithImages
-      });
-      
-      // Update the saved assessments list
-      setSavedAssessments(prev => [assessment, ...prev]);
-      
+
+      // Set up the current assessment with questions
+      const newAssessment: AssessmentWithQuestions = {
+        ...assessmentData,
+        questions: questionData.map(q => ({ ...q, images: [] })),
+      };
+
+      setCurrentAssessment(newAssessment);
       toast.success('New assessment created');
-    } catch (error: any) {
-      toast.error(`Error creating assessment: ${error.message}`);
-      console.error('Error creating assessment:', error);
+      return assessmentData.id;
+
+    } catch (error) {
+      console.error('Error in createAssessment:', error);
+      toast.error('Unexpected error creating assessment');
+      return null;
+    } finally {
+      setIsLoading(false);
     }
   };
-  
+
   // Load an existing assessment
-  const loadAssessment = async (assessmentId: string) => {
-    if (!user) {
-      toast.error('You must be logged in to load an assessment');
-      return;
-    }
-    
+  const loadAssessment = async (assessmentId: string): Promise<boolean> => {
     try {
-      // Fetch the assessment
+      setIsLoading(true);
+      
+      // Fetch assessment data
       const { data: assessment, error: assessmentError } = await supabase
         .from('assessments')
         .select('*')
         .eq('id', assessmentId)
-        .eq('user_id', user.id)
         .single();
-        
+
       if (assessmentError) {
-        throw assessmentError;
+        console.error('Error loading assessment:', assessmentError);
+        toast.error('Error loading assessment');
+        return false;
       }
-      
-      // Fetch the questions
+
+      // Fetch questions for this assessment
       const { data: questions, error: questionsError } = await supabase
         .from('assessment_questions')
         .select('*')
         .eq('assessment_id', assessmentId)
-        .order('question_number');
-        
+        .order('question_number', { ascending: true });
+
       if (questionsError) {
-        throw questionsError;
+        console.error('Error loading questions:', questionsError);
+        toast.error('Error loading questions');
+        return false;
       }
-      
-      // For each question, fetch associated images
-      const questionsWithImages = await Promise.all(questions.map(async (question: AssessmentQuestion) => {
-        const { data: images, error: imagesError } = await supabase
-          .from('question_images')
-          .select('image_url')
-          .eq('question_id', question.id);
-          
-        if (imagesError) {
-          console.error(`Error fetching images for question ${question.id}:`, imagesError);
-          return { ...question, images: [] as string[] };
-        }
-        
-        return {
-          ...question,
-          images: images.map((img: { image_url: string }) => img.image_url)
-        } as QuestionWithImages;
-      }));
-      
-      // Set the current assessment
+
+      // Fetch images for all questions
+      const questionsWithImages = await Promise.all(
+        questions.map(async (question) => {
+          const { data: images, error: imagesError } = await supabase
+            .from('question_images')
+            .select('image_url')
+            .eq('question_id', question.id);
+
+          if (imagesError) {
+            console.error(`Error loading images for question ${question.id}:`, imagesError);
+            return { ...question, images: [] };
+          }
+
+          return { 
+            ...question, 
+            images: images.map(img => img.image_url) 
+          };
+        })
+      );
+
+      // Set up the current assessment with questions and images
       setCurrentAssessment({
         ...assessment,
-        questions: questionsWithImages
+        questions: questionsWithImages,
       });
-    } catch (error: any) {
-      toast.error(`Error loading assessment: ${error.message}`);
-      console.error('Error loading assessment:', error);
+      
+      return true;
+    } catch (error) {
+      console.error('Error in loadAssessment:', error);
+      toast.error('Unexpected error loading assessment');
+      return false;
+    } finally {
+      setIsLoading(false);
     }
   };
-  
-  // Update a question's answer, comment, and images
+
+  // Update a question's answer
   const updateQuestion = async (
     questionId: string, 
     answer: 'yes' | 'no' | 'n/a' | null, 
-    comment: string | null, 
+    comment: string,
     images: string[]
-  ) => {
-    if (!currentAssessment) return;
-    
+  ): Promise<boolean> => {
+    if (!currentAssessment) return false;
+
     try {
-      // Update the question in the database
-      const { error: updateError } = await supabase
+      // Update the question in database
+      const { error } = await supabase
         .from('assessment_questions')
-        .update({ 
+        .update({
           answer,
           comment,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq('id', questionId);
-        
-      if (updateError) {
-        throw updateError;
+
+      if (error) {
+        console.error('Error updating question:', error);
+        toast.error('Error saving answer');
+        return false;
       }
-      
-      // Update images
-      // First, delete all existing images
-      await supabase
-        .from('question_images')
-        .delete()
-        .eq('question_id', questionId);
-        
-      // Then add new images if any
-      if (images.length > 0) {
-        const imagesToInsert = images.map(url => ({
-          question_id: questionId,
-          image_url: url
-        }));
-        
-        const { error: imagesError } = await supabase
-          .from('question_images')
-          .insert(imagesToInsert);
-          
-        if (imagesError) {
-          throw imagesError;
-        }
-      }
-      
-      // Update the current assessment in state
+
+      // Update local state
       setCurrentAssessment(prev => {
         if (!prev) return null;
         
@@ -270,28 +197,57 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           ...prev,
           questions: prev.questions.map(q => 
             q.id === questionId 
-              ? { ...q, answer, comment, images } 
+              ? { ...q, answer, comment, images }
               : q
-          )
+          ),
         };
       });
       
-      toast.success('Question updated');
-    } catch (error: any) {
-      toast.error(`Error updating question: ${error.message}`);
-      console.error('Error updating question:', error);
+      return true;
+    } catch (error) {
+      console.error('Error in updateQuestion:', error);
+      toast.error('Unexpected error saving answer');
+      return false;
     }
   };
-  
+
+  // Mark assessment as complete
+  const completeAssessment = async (): Promise<boolean> => {
+    if (!currentAssessment) return false;
+    
+    try {
+      const { error } = await supabase
+        .from('assessments')
+        .update({
+          completed: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', currentAssessment.id);
+
+      if (error) {
+        console.error('Error completing assessment:', error);
+        toast.error('Error completing assessment');
+        return false;
+      }
+
+      setCurrentAssessment(prev => {
+        if (!prev) return null;
+        return { ...prev, completed: true };
+      });
+      
+      toast.success('Assessment completed successfully');
+      return true;
+    } catch (error) {
+      console.error('Error in completeAssessment:', error);
+      toast.error('Unexpected error completing assessment');
+      return false;
+    }
+  };
+
   // Calculate assessment results
-  const calculateResults = (): AssessmentResult => {
+  const calculateResults = () => {
     if (!currentAssessment) {
-      return {
-        totalQuestions: 0,
-        applicableQuestions: 0,
-        yesAnswers: 0,
-        percentage: 0
-      };
+      return { totalQuestions: 0, applicableQuestions: 0, yesAnswers: 0, percentage: 0 };
     }
     
     const totalQuestions = currentAssessment.questions.length;
@@ -301,81 +257,73 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       ? Math.round((yesAnswers / applicableQuestions) * 100) 
       : 0;
     
-    return {
-      totalQuestions,
-      applicableQuestions,
-      yesAnswers,
-      percentage
-    };
+    return { totalQuestions, applicableQuestions, yesAnswers, percentage };
   };
-  
-  // Mark an assessment as complete
-  const completeAssessment = async () => {
-    if (!currentAssessment) return;
+
+  // Upload an image for a question
+  const uploadImage = async (file: File, questionId: string): Promise<string | null> => {
+    if (!currentAssessment) return null;
     
     try {
-      const { error } = await supabase
-        .from('assessments')
-        .update({ 
-          completed: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', currentAssessment.id);
+      // Generate a unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${questionId}/${uuidv4()}.${fileExt}`;
+      const filePath = `${currentAssessment.user_id}/${fileName}`;
+      
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('assessment-images')
+        .upload(filePath, file);
         
-      if (error) {
-        throw error;
+      if (uploadError) {
+        console.error('Error uploading image:', uploadError);
+        return null;
       }
       
-      // Update the current assessment
-      setCurrentAssessment(prev => {
-        if (!prev) return null;
-        return { ...prev, completed: true };
-      });
+      // Get the public URL
+      const { data: urlData } = supabase.storage
+        .from('assessment-images')
+        .getPublicUrl(filePath);
+        
+      const imageUrl = urlData.publicUrl;
       
-      // Update saved assessments
-      setSavedAssessments(prev => 
-        prev.map(a => 
-          a.id === currentAssessment.id ? { ...a, completed: true } : a
-        )
-      );
+      // Store the image reference in database
+      const { error: dbError } = await supabase
+        .from('question_images')
+        .insert({
+          question_id: questionId,
+          image_url: imageUrl,
+        });
+        
+      if (dbError) {
+        console.error('Error saving image reference:', dbError);
+        return null;
+      }
       
-      toast.success('Assessment completed!');
-    } catch (error: any) {
-      toast.error(`Error completing assessment: ${error.message}`);
-      console.error('Error completing assessment:', error);
+      return imageUrl;
+    } catch (error) {
+      console.error('Error in uploadImage:', error);
+      return null;
     }
   };
-  
-  // Refresh assessments list when user changes
-  useEffect(() => {
-    if (user) {
-      fetchAssessments();
-    } else {
-      setSavedAssessments([]);
-      setCurrentAssessment(null);
-      setLoading(false);
-    }
-  }, [user]);
-  
-  const value = {
-    currentAssessment,
-    savedAssessments,
-    loading,
-    fetchAssessments,
-    createNewAssessment,
-    loadAssessment,
-    updateQuestion,
-    calculateResults,
-    completeAssessment
-  };
-  
+
   return (
-    <AssessmentContext.Provider value={value}>
+    <AssessmentContext.Provider value={{
+      currentAssessment,
+      isLoading,
+      createAssessment,
+      loadAssessment,
+      updateQuestion,
+      completeAssessment,
+      calculateResults,
+      uploadImage,
+    }}>
       {children}
     </AssessmentContext.Provider>
   );
 };
 
+// Custom hook to use assessment context
 export const useAssessment = () => {
   const context = useContext(AssessmentContext);
   if (context === undefined) {
