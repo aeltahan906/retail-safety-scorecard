@@ -1,32 +1,39 @@
-import React, { useState } from 'react';
-import { useAssessment } from '@/contexts/AssessmentContext'; // Import the custom hook
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 
-const Assessment = () => {
-  const { createAssessment } = useAssessment(); // Destructure createAssessment from context
-  const [storeName, setStoreName] = useState('');
-  const [currentPage, setCurrentPage] = useState(0);
+type Assessment = {
+  id: number;
+  storeName: string;
+};
 
-  const handleCreateAssessment = async () => {
-    const assessment = await createAssessment(storeName);
-    if (assessment) {
-      console.log("Assessment created:", assessment);
-      setCurrentPage(0); // Move to the first page of the assessment or do other actions
-    } else {
-      console.error("Failed to create assessment");
-    }
+type AssessmentContextType = {
+  createAssessment: (storeName: string) => Promise<Assessment>;
+};
+
+const AssessmentContext = createContext<AssessmentContextType | undefined>(undefined);
+
+export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+
+  const createAssessment = async (storeName: string): Promise<Assessment> => {
+    const newAssessment = {
+      id: Date.now(),
+      storeName,
+    };
+    setAssessments((prev) => [...prev, newAssessment]);
+    return newAssessment;
   };
 
   return (
-    <div>
-      <input
-        type="text"
-        value={storeName}
-        onChange={(e) => setStoreName(e.target.value)}
-        placeholder="Enter store name"
-      />
-      <button onClick={handleCreateAssessment}>Create Assessment</button>
-    </div>
+    <AssessmentContext.Provider value={{ createAssessment }}>
+      {children}
+    </AssessmentContext.Provider>
   );
 };
 
-export default Assessment;
+export const useAssessment = () => {
+  const context = useContext(AssessmentContext);
+  if (!context) {
+    throw new Error('useAssessment must be used within an AssessmentProvider');
+  }
+  return context;
+};
