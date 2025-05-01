@@ -1,36 +1,92 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, ShieldCheck } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ShieldCheck, Info, AlertCircle, Loader2 } from 'lucide-react';
 
 const Login = () => {
-  const [username, setUsername] = useState('');
+  // Login form state
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login, user } = useAuth();
+  
+  // Register form state
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPassword, setRegisterPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [name, setName] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+  
+  // Error handling
+  const [error, setError] = useState<string | null>(null);
+  
+  const { user, signIn, signUp } = useAuth();
   const navigate = useNavigate();
+
+  // Clear error when inputs change
+  useEffect(() => {
+    if (error) setError(null);
+  }, [email, password, registerEmail, registerPassword, confirmPassword, name]);
 
   // If already logged in, redirect to assessment page
   if (user) {
     return <Navigate to="/assessment" />;
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
     
     try {
-      const success = await login(username, password);
+      const { success, error } = await signIn(email, password);
       if (success) {
         navigate('/assessment');
+      } else if (error) {
+        setError(error);
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsRegistering(true);
+    setError(null);
+    
+    // Basic validation
+    if (registerPassword !== confirmPassword) {
+      setError("Passwords don't match");
+      setIsRegistering(false);
+      return;
+    }
+    
+    if (registerPassword.length < 6) {
+      setError("Password must be at least 6 characters");
+      setIsRegistering(false);
+      return;
+    }
+    
+    try {
+      const { success, error } = await signUp(registerEmail, registerPassword, name);
+      if (success) {
+        // Reset form fields after successful registration
+        setRegisterEmail('');
+        setRegisterPassword('');
+        setConfirmPassword('');
+        setName('');
+      } else if (error) {
+        setError(error);
+      }
+    } finally {
+      setIsRegistering(false);
     }
   };
 
@@ -39,63 +95,169 @@ const Login = () => {
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-8">
           <div className="flex items-center space-x-2">
-            <ShieldCheck className="h-10 w-10 text-hsse-blue" />
-            <h1 className="text-3xl font-bold text-hsse-blue">HSSE Assessment</h1>
+            <ShieldCheck className="h-10 w-10 text-blue-600" />
+            <h1 className="text-3xl font-bold text-blue-600">HSSE Assessment</h1>
           </div>
         </div>
         
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl">Login to your account</CardTitle>
-            <CardDescription>
-              Enter your credentials to access the HSSE assessment tool
-            </CardDescription>
-          </CardHeader>
+        <Tabs defaultValue="login" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsTrigger value="login">Login</TabsTrigger>
+            <TabsTrigger value="register">Register</TabsTrigger>
+          </TabsList>
           
-          <form onSubmit={handleSubmit}>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  placeholder="Enter your username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                />
-              </div>
+          <TabsContent value="login">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-xl">Login to your account</CardTitle>
+                <CardDescription>
+                  Enter your credentials to access the HSSE assessment tool
+                </CardDescription>
+              </CardHeader>
               
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-            </CardContent>
-            
-            <CardFooter>
-              <Button 
-                type="submit" 
-                className="w-full bg-hsse-blue hover:bg-hsse-lightBlue" 
-                disabled={isLoading}
-              >
-                {isLoading ? "Logging in..." : "Login"}
-              </Button>
-            </CardFooter>
-          </form>
-        </Card>
-        
-        <div className="mt-6 text-center text-sm text-gray-500">
-          <div className="flex justify-center items-center space-x-2 mt-8">
-            <CheckCircle className="h-4 w-4 text-hsse-green" />
-            <p>Demo accounts: admin/admin123 or user/user123</p>
-          </div>
-        </div>
+              <form onSubmit={handleSignIn}>
+                <CardContent className="space-y-4">
+                  {error && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+                
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="Enter your email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                </CardContent>
+                
+                <CardFooter>
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-blue-600 hover:bg-blue-700" 
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Logging in...
+                      </>
+                    ) : "Login"}
+                  </Button>
+                </CardFooter>
+              </form>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="register">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-xl">Create an account</CardTitle>
+                <CardDescription>
+                  Register for access to the HSSE assessment tool
+                </CardDescription>
+              </CardHeader>
+              
+              <form onSubmit={handleSignUp}>
+                <CardContent className="space-y-4">
+                  {error && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="register-name">Full Name</Label>
+                    <Input
+                      id="register-name"
+                      placeholder="Enter your name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="register-email">Email</Label>
+                    <Input
+                      id="register-email"
+                      type="email"
+                      placeholder="Enter your email"
+                      value={registerEmail}
+                      onChange={(e) => setRegisterEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="register-password">Password</Label>
+                    <Input
+                      id="register-password"
+                      type="password"
+                      placeholder="Create a password"
+                      value={registerPassword}
+                      onChange={(e) => setRegisterPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-password">Confirm Password</Label>
+                    <Input
+                      id="confirm-password"
+                      type="password"
+                      placeholder="Confirm your password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                  
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertDescription>
+                      After registration, you'll receive a verification email. Please check your inbox and verify your account.
+                    </AlertDescription>
+                  </Alert>
+                </CardContent>
+                
+                <CardFooter>
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-blue-600 hover:bg-blue-700" 
+                    disabled={isRegistering}
+                  >
+                    {isRegistering ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating account...
+                      </>
+                    ) : "Register"}
+                  </Button>
+                </CardFooter>
+              </form>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

@@ -9,7 +9,130 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      assessment_questions: {
+        Row: {
+          answer: string | null
+          assessment_id: string
+          comment: string | null
+          created_at: string
+          id: string
+          question_number: number
+          question_text: string
+          updated_at: string
+        }
+        Insert: {
+          answer?: string | null
+          assessment_id: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          question_number: number
+          question_text: string
+          updated_at?: string
+        }
+        Update: {
+          answer?: string | null
+          assessment_id?: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          question_number?: number
+          question_text?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_questions_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assessments: {
+        Row: {
+          completed: boolean
+          created_at: string
+          date: string
+          id: string
+          store_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean
+          created_at?: string
+          date?: string
+          id?: string
+          store_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean
+          created_at?: string
+          date?: string
+          id?: string
+          store_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          name: string
+          role?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          role?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      question_images: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          question_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          question_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          question_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_images_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

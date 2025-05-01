@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
-import { Form } from '@/components/ui/form';
 import QuestionCard from '@/components/AssessmentForm';
 import { CheckCircle, ShieldCheck, AlertCircle, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
@@ -17,9 +16,12 @@ import { toast } from 'sonner';
 const QUESTIONS_PER_PAGE = 5;
 
 const Assessment = () => {
-  const { user, logout } = useAuth();
+  const { user, signOut } = useAuth();
   const { 
-    assessment, 
+    currentAssessment, 
+    savedAssessments,
+    loading,
+    fetchAssessments,
     createNewAssessment, 
     updateQuestion, 
     calculateResults, 
@@ -27,51 +29,65 @@ const Assessment = () => {
   } = useAssessment();
   const [storeName, setStoreName] = useState('');
   const [currentPage, setCurrentPage] = useState(0);
+  const [isCreating, setIsCreating] = useState(false);
   const navigate = useNavigate();
   
   // Redirect if not logged in
   useEffect(() => {
     if (!user) {
       navigate('/login');
+      return;
     }
-  }, [user, navigate]);
+    
+    // Load saved assessments when component mounts
+    fetchAssessments();
+  }, [user, navigate, fetchAssessments]);
 
   // Handle store name submission
-  const handleCreateAssessment = (e: React.FormEvent) => {
+  const handleCreateAssessment = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (storeName.trim() === '') {
       toast.error("Please enter a store name");
       return;
     }
-    createNewAssessment(storeName);
+    
+    setIsCreating(true);
+    
+    try {
+      await createNewAssessment(storeName);
+      setCurrentPage(0); // Reset to first page
+    } finally {
+      setIsCreating(false);
+    }
   };
   
   // Calculate progress
   const calculateProgress = () => {
-    if (!assessment) return 0;
+    if (!currentAssessment) return 0;
     
-    const answeredCount = assessment.questions.filter(q => q.answer !== null).length;
-    return Math.round((answeredCount / assessment.questions.length) * 100);
+    const answeredCount = currentAssessment.questions.filter(q => q.answer !== null).length;
+    return Math.round((answeredCount / currentAssessment.questions.length) * 100);
   };
   
   // Handle question update
-  const handleQuestionUpdate = (questionId: number, answer: any, comment: string, images: string[]) => {
+  const handleQuestionUpdate = (questionId: string, answer: 'yes' | 'no' | 'n/a' | null, comment: string, images: string[]) => {
     updateQuestion(questionId, answer, comment, images);
   };
   
   // Get current page questions
   const getCurrentPageQuestions = () => {
-    if (!assessment) return [];
+    if (!currentAssessment) return [];
     
     const startIndex = currentPage * QUESTIONS_PER_PAGE;
-    return assessment.questions.slice(startIndex, startIndex + QUESTIONS_PER_PAGE);
+    return currentAssessment.questions.slice(startIndex, startIndex + QUESTIONS_PER_PAGE);
   };
   
   // Handle page navigation
   const handleNextPage = () => {
-    if (!assessment) return;
+    if (!currentAssessment) return;
     
-    const maxPage = Math.ceil(assessment.questions.length / QUESTIONS_PER_PAGE) - 1;
+    const maxPage = Math.ceil(currentAssessment.questions.length / QUESTIONS_PER_PAGE) - 1;
     if (currentPage < maxPage) {
       setCurrentPage(currentPage + 1);
       window.scrollTo(0, 0);
@@ -86,22 +102,30 @@ const Assessment = () => {
   };
   
   // Handle assessment completion
-  const handleComplete = () => {
-    const unansweredCount = assessment?.questions.filter(q => q.answer === null).length || 0;
+  const handleComplete = async () => {
+    if (!currentAssessment) return;
+    
+    const unansweredCount = currentAssessment.questions.filter(q => q.answer === null).length;
     
     if (unansweredCount > 0) {
       toast.error(`Please answer all questions. ${unansweredCount} question(s) remaining.`);
       return;
     }
     
-    completeAssessment();
+    await completeAssessment();
     navigate('/results');
   };
   
-  if (!user) {
+  // Handle loading a saved assessment
+  const handleLoadAssessment = async (assessmentId: string) => {
+    await loadAssessment(assessmentId);
+    setCurrentPage(0); // Reset to first page
+  };
+  
+  if (loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Loader2 className="h-8 w-8 animate-spin text-hsse-blue" />
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
       </div>
     );
   }
@@ -112,7 +136,7 @@ const Assessment = () => {
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex justify-between items-center">
           <div className="flex items-center">
-            <ShieldCheck className="h-8 w-8 text-hsse-blue mr-2" />
+            <ShieldCheck className="h-8 w-8 text-blue-600 mr-2" />
             <h1 className="text-xl font-bold text-gray-900">HSSE Assessment Tool</h1>
           </div>
           <div className="flex items-center space-x-4">
@@ -122,7 +146,7 @@ const Assessment = () => {
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => logout()}
+              onClick={() => signOut()}
             >
               Logout
             </Button>
@@ -131,49 +155,100 @@ const Assessment = () => {
       </header>
       
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {!assessment ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>New HSSE Assessment</CardTitle>
-            </CardHeader>
-            <form onSubmit={handleCreateAssessment}>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="storeName">Store Name</Label>
-                    <Input
-                      id="storeName"
-                      value={storeName}
-                      onChange={(e) => setStoreName(e.target.value)}
-                      placeholder="Enter the store name"
-                      required
-                    />
+        {!currentAssessment ? (
+          <div className="space-y-6">
+            {/* New Assessment Form */}
+            <Card>
+              <CardHeader>
+                <CardTitle>New HSSE Assessment</CardTitle>
+              </CardHeader>
+              <form onSubmit={handleCreateAssessment}>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="storeName">Store Name</Label>
+                      <Input
+                        id="storeName"
+                        value={storeName}
+                        onChange={(e) => setStoreName(e.target.value)}
+                        placeholder="Enter the store name"
+                        required
+                      />
+                    </div>
+                    
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Information</AlertTitle>
+                      <AlertDescription>
+                        This assessment contains 20 questions. Each answer of "Yes" contributes 5 points.
+                        Final score will be calculated as percentage of "Yes" answers out of total applicable questions.
+                      </AlertDescription>
+                    </Alert>
                   </div>
-                  
-                  <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Information</AlertTitle>
-                    <AlertDescription>
-                      This assessment contains 20 questions. Each answer of "Yes" contributes 5 points.
-                      Final score will be calculated as percentage of "Yes" answers out of total applicable questions.
-                    </AlertDescription>
-                  </Alert>
+                </CardContent>
+                <CardFooter>
+                  <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isCreating}>
+                    {isCreating ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating...
+                      </>
+                    ) : "Start Assessment"}
+                  </Button>
+                </CardFooter>
+              </form>
+            </Card>
+            
+            {/* Saved Assessments List */}
+            {savedAssessments.length > 0 && (
+              <div className="mt-8">
+                <h2 className="text-lg font-semibold mb-4">Saved Assessments</h2>
+                <div className="space-y-4">
+                  {savedAssessments.map((assessment) => (
+                    <Card key={assessment.id} className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h3 className="font-medium">{assessment.store_name}</h3>
+                            <p className="text-sm text-gray-500">
+                              {new Date(assessment.date).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="flex space-x-2">
+                            {assessment.completed ? (
+                              <Button 
+                                size="sm" 
+                                className="bg-green-600 hover:bg-green-700"
+                                onClick={() => navigate(`/results?id=${assessment.id}`)}
+                              >
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                View Results
+                              </Button>
+                            ) : (
+                              <Button 
+                                size="sm" 
+                                className="bg-blue-600 hover:bg-blue-700"
+                                onClick={() => handleLoadAssessment(assessment.id)}
+                              >
+                                Continue
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
-              </CardContent>
-              <CardFooter>
-                <Button type="submit" className="w-full bg-hsse-blue hover:bg-hsse-lightBlue">
-                  Start Assessment
-                </Button>
-              </CardFooter>
-            </form>
-          </Card>
+              </div>
+            )}
+          </div>
         ) : (
           <div className="space-y-6">
             <div className="bg-white p-4 rounded-lg shadow-sm">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">{assessment.storeName}</h2>
+                <h2 className="text-xl font-bold">{currentAssessment.store_name}</h2>
                 <span className="text-sm text-gray-500">
-                  {new Date(assessment.date).toLocaleDateString()}
+                  {new Date(currentAssessment.date).toLocaleDateString()}
                 </span>
               </div>
               
@@ -190,8 +265,9 @@ const Assessment = () => {
               {getCurrentPageQuestions().map((question) => (
                 <QuestionCard
                   key={question.id}
-                  questionNumber={question.id}
-                  questionText={question.text}
+                  id={question.id}
+                  questionNumber={question.question_number}
+                  questionText={question.question_text}
                   answer={question.answer}
                   comment={question.comment}
                   images={question.images}
@@ -214,17 +290,17 @@ const Assessment = () => {
               </Button>
               
               <div className="flex space-x-2">
-                {assessment.completed ? (
+                {currentAssessment.completed ? (
                   <Button 
                     variant="outline"
-                    onClick={() => navigate('/results')}
+                    onClick={() => navigate(`/results?id=${currentAssessment.id}`)}
                   >
                     View Results
                   </Button>
                 ) : (
                   <Button 
                     onClick={handleComplete}
-                    className="bg-hsse-green hover:bg-green-600 text-white flex items-center"
+                    className="bg-green-600 hover:bg-green-700 text-white flex items-center"
                   >
                     <CheckCircle className="h-4 w-4 mr-1" />
                     Complete Assessment
@@ -233,8 +309,8 @@ const Assessment = () => {
                 
                 <Button 
                   onClick={handleNextPage}
-                  disabled={currentPage >= Math.ceil(assessment.questions.length / QUESTIONS_PER_PAGE) - 1}
-                  className="bg-hsse-blue hover:bg-hsse-lightBlue flex items-center"
+                  disabled={currentPage >= Math.ceil(currentAssessment.questions.length / QUESTIONS_PER_PAGE) - 1}
+                  className="bg-blue-600 hover:bg-blue-700 flex items-center"
                 >
                   Next
                   <ChevronRight className="h-4 w-4 ml-1" />
