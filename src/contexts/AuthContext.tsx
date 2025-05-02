@@ -1,7 +1,8 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from "sonner";
 import { Session, User } from '@supabase/supabase-js';
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, getSiteUrl } from "@/integrations/supabase/client";
 import { Profile } from '@/types/database';
 
 // Define types
@@ -200,7 +201,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const resetPassword = async (email: string): Promise<{ success: boolean, error?: string }> => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + '/reset-password',
+        redirectTo: `${getSiteUrl()}/reset-password`,
       });
 
       if (error) {

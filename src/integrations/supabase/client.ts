@@ -9,10 +9,20 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
+// Helper function to determine the current site URL
+export const getSiteUrl = () => {
+  // Get the current URL
+  const url = window.location.origin;
+  return url;
+};
+
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
     autoRefreshToken: true,
     persistSession: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce',
+    redirectTo: getSiteUrl()
   }
 });
