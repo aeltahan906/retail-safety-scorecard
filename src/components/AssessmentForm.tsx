@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useProfile } from '@/hooks/useProfile';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -28,6 +29,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
   images,
   onUpdate
 }) => {
+  const { profile, loading, error } = useProfile();
   const [localComment, setLocalComment] = useState<string>(comment || '');
   const [localImages, setLocalImages] = useState<string[]>(images);
   const [isUploading, setIsUploading] = useState(false);
