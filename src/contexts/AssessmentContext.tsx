@@ -5,6 +5,7 @@ import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
 import { Assessment, AssessmentQuestion, AssessmentWithQuestions, AssessmentResult } from '@/types/database';
+import { Database } from '@/integrations/supabase/types';
 
 // Default questions for a new assessment
 const DEFAULT_QUESTIONS = [
@@ -59,25 +60,18 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
       throw new Error('User is not authenticated');
     }
 
-    const newAssessment = {
-      id: uuidv4(),
-      user_id: user.id,
-      store_name: storeName,
-      date: new Date().toISOString(),
-      completed: false
-    };
-    
     const { data, error } = await supabase
       .from('assessments')
       .insert({ 
         store_name: storeName,
         user_id: user.id,
         date: new Date().toISOString(),
+        completed: false
       })
       .select()
       .single();
       
-    if (error) {
+    if (error || !data) {
       console.error('Error creating assessment:', error);
       toast.error('Failed to create assessment');
       throw error;
@@ -103,7 +97,7 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
         
-      if (assessmentsError) {
+      if (assessmentsError || !assessmentsData) {
         console.error('Error fetching assessments:', assessmentsError);
         toast.error('Failed to load assessments');
         return;
@@ -118,7 +112,7 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
           .select('*')
           .eq('assessment_id', assessment.id);
           
-        if (questionsError) {
+        if (questionsError || !questionsData) {
           console.error('Error fetching questions:', questionsError);
           continue;
         }
@@ -130,13 +124,21 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
             .select('image_url')
             .eq('question_id', question.id);
             
-          if (imagesError) {
+          if (imagesError || !imagesData) {
             console.error('Error fetching images:', imagesError);
-            return { ...question, images: [] };
+            return { 
+              ...question, 
+              images: [],
+              answer: question.answer as 'yes' | 'no' | 'n/a' | null 
+            };
           }
           
           const images = imagesData.map(img => img.image_url);
-          return { ...question, images, answer: question.answer as 'yes' | 'no' | 'n/a' | null };
+          return { 
+            ...question, 
+            images, 
+            answer: question.answer as 'yes' | 'no' | 'n/a' | null 
+          };
         }));
         
         assessmentsWithQuestions.push({
@@ -162,28 +164,20 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
       const assessment = await createAssessment(storeName);
       
       // Create questions for the assessment
-      const questionsWithIds = DEFAULT_QUESTIONS.map((q) => ({
-        ...q,
+      const questionsToInsert = DEFAULT_QUESTIONS.map((q) => ({
         assessment_id: assessment.id,
-        answer: null as 'yes' | 'no' | 'n/a' | null,
-        comment: null,
-        images: [] as string[]
+        question_number: q.question_number,
+        question_text: q.question_text,
+        answer: null,
+        comment: null
       }));
       
       const { data: questionsData, error: questionsError } = await supabase
         .from('assessment_questions')
-        .insert(
-          DEFAULT_QUESTIONS.map((q) => ({
-            assessment_id: assessment.id,
-            question_number: q.question_number,
-            question_text: q.question_text,
-            answer: null,
-            comment: null
-          }))
-        )
+        .insert(questionsToInsert)
         .select();
         
-      if (questionsError) {
+      if (questionsError || !questionsData) {
         console.error('Error creating questions:', questionsError);
         toast.error('Failed to create assessment questions');
         return;
@@ -227,7 +221,7 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
         .select('*')
         .eq('assessment_id', assessmentId);
         
-      if (questionsError) {
+      if (questionsError || !questionsData) {
         console.error('Error loading questions:', questionsError);
         toast.error('Failed to load assessment questions');
         return;
@@ -240,13 +234,21 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
           .select('image_url')
           .eq('question_id', question.id);
           
-        if (imagesError) {
+        if (imagesError || !imagesData) {
           console.error('Error fetching images:', imagesError);
-          return { ...question, images: [] };
+          return { 
+            ...question, 
+            images: [],
+            answer: question.answer as 'yes' | 'no' | 'n/a' | null 
+          };
         }
         
         const images = imagesData.map(img => img.image_url);
-        return { ...question, images, answer: question.answer as 'yes' | 'no' | 'n/a' | null };
+        return { 
+          ...question, 
+          images,
+          answer: question.answer as 'yes' | 'no' | 'n/a' | null 
+        };
       }));
       
       setCurrentAssessment({
@@ -277,7 +279,10 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
     // Update database
     supabase
       .from('assessment_questions')
-      .update({ answer, comment })
+      .update({ 
+        answer: answer as string | null, 
+        comment 
+      })
       .eq('id', questionId)
       .then(({ error }) => {
         if (error) {
