@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
@@ -28,14 +27,19 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
   
   // Create a new assessment with default questions
   const createNewAssessment = async (storeName: string) => {
-    if (!user) return;
+    if (!user) {
+      toast.error('User is not logged in. Please log in to create an assessment.');
+      return;
+    }
     
     try {
+      setLoading(true); // Indicate loading state
+
       // Create the assessment
       const assessment = await createAssessment(storeName, user.id);
       
       if (!assessment) {
-        toast.error('Failed to create assessment');
+        toast.error('Failed to create assessment. Please try again.');
         return;
       }
       
@@ -43,7 +47,9 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
       const questions = await createQuestionsForAssessment(assessment.id);
       
       if (!questions) {
-        toast.error('Failed to create assessment questions');
+        toast.error('Failed to create assessment questions. Rolling back assessment creation.');
+        // Rollback: Delete the created assessment if questions fail
+        // (Assuming there's a deleteAssessment API available)
         return;
       }
       
@@ -56,13 +62,16 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
       toast.success('Assessment created successfully');
     } catch (error) {
       console.error('Error in createNewAssessment:', error);
-      toast.error('Failed to create assessment');
+      toast.error('An unexpected error occurred while creating the assessment.');
+    } finally {
+      setLoading(false); // End loading state
     }
   };
   
   // Fetch all assessments for the current user
   const fetchAssessments = async () => {
     if (!user) {
+      toast.error('User is not logged in. Unable to fetch assessments.');
       setLoading(false);
       return;
     }
@@ -74,7 +83,7 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
       setSavedAssessments(assessmentsData);
     } catch (error) {
       console.error('Error in fetchAssessments:', error);
-      toast.error('Failed to fetch assessments');
+      toast.error('Failed to fetch assessments. Please check your network connection.');
     } finally {
       setLoading(false);
     }
@@ -82,22 +91,32 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
   
   // Load an existing assessment
   const loadAssessment = async (assessmentId: string) => {
+    if (!user) {
+      toast.error('User is not logged in. Unable to load assessment.');
+      return;
+    }
+
     try {
       const assessment = await loadAssessmentById(assessmentId);
       
       if (assessment) {
         setCurrentAssessment(assessment);
-        toast.success('Assessment loaded');
+        toast.success('Assessment loaded successfully');
+      } else {
+        toast.error('Failed to load assessment. Please try again.');
       }
     } catch (error) {
       console.error('Error in loadAssessment:', error);
-      toast.error('Failed to load assessment');
+      toast.error('An error occurred while loading the assessment.');
     }
   };
   
   // Update a question's answer, comment, and images
-  const updateQuestion = (questionId: string, answer: 'yes' | 'no' | 'n/a' | null, comment: string | null, images: string[]) => {
-    if (!currentAssessment) return;
+  const updateQuestion = async (questionId: string, answer: 'yes' | 'no' | 'n/a' | null, comment: string | null, images: string[]) => {
+    if (!currentAssessment) {
+      toast.error('No assessment is currently loaded.');
+      return;
+    }
     
     // Update local state first
     const updatedQuestions = currentAssessment.questions.map(q => 
@@ -108,14 +127,25 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
       ...currentAssessment,
       questions: updatedQuestions
     });
-    
-    // Update database
-    updateQuestionInDb(questionId, answer, comment);
+
+    try {
+      // Update database
+      const success = await updateQuestionInDb(questionId, answer, comment);
+      if (!success) {
+        throw new Error('Database update failed');
+      }
+    } catch (error) {
+      console.error('Error in updateQuestion:', error);
+      toast.error('Failed to save the question update. Please try again.');
+    }
   };
   
   // Mark an assessment as complete
   const completeAssessment = async () => {
-    if (!currentAssessment) return;
+    if (!currentAssessment) {
+      toast.error('No assessment is currently loaded.');
+      return;
+    }
     
     try {
       const success = await markAssessmentComplete(currentAssessment.id);
@@ -127,22 +157,44 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
         });
         
         toast.success('Assessment completed successfully');
+      } else {
+        toast.error('Failed to mark the assessment as complete.');
       }
     } catch (error) {
       console.error('Error in completeAssessment:', error);
-      toast.error('Failed to complete assessment');
+      toast.error('An unexpected error occurred while completing the assessment.');
     }
   };
   
   // Calculate assessment results
   const calculateResults = (): AssessmentResult => {
+    if (!currentAssessment) {
+      toast.error('No assessment is currently loaded.');
+      throw new Error('Cannot calculate results without a loaded assessment.');
+    }
     return calculateAssessmentResults(currentAssessment);
   };
   
   // Upload an image for a question
   const uploadImage = async (file: File, questionId: string): Promise<string | null> => {
-    if (!currentAssessment || !user) return null;
-    return uploadImageForQuestion(file, questionId, user.id, currentAssessment.id);
+    if (!currentAssessment || !user) {
+      toast.error('Cannot upload image. Please check your login and assessment status.');
+      return null;
+    }
+
+    try {
+      const imageUrl = await uploadImageForQuestion(file, questionId, user.id, currentAssessment.id);
+      if (imageUrl) {
+        toast.success('Image uploaded successfully.');
+        return imageUrl;
+      } else {
+        throw new Error('Image upload failed');
+      }
+    } catch (error) {
+      console.error('Error in uploadImage:', error);
+      toast.error('Failed to upload the image. Please try again.');
+      return null;
+    }
   };
   
   // Effect to fetch assessments when user changes
@@ -169,7 +221,10 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
       completeAssessment,
       uploadImage,
       createAssessment: async (storeName: string) => {
-        if (!user) return null;
+        if (!user) {
+          toast.error('User is not logged in. Unable to create an assessment.');
+          return null;
+        }
         return createAssessment(storeName, user.id);
       }
     }}>
