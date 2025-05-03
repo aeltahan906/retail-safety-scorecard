@@ -52,11 +52,14 @@ export const createQuestionsForAssessment = async (assessmentId: string): Promis
     return null;
   }
   
-  return questionsData.map((q) => ({
-    ...q as any, // Using any to bypass spread type error
-    images: [] as string[],
-    answer: q.answer as 'yes' | 'no' | 'n/a' | null
-  })) as AssessmentQuestion[];
+  return questionsData.map((q) => {
+    if (!q) return null;
+    return {
+      ...q,
+      images: [] as string[],
+      answer: q.answer as 'yes' | 'no' | 'n/a' | null
+    };
+  }).filter(Boolean) as AssessmentQuestion[];
 };
 
 // Fetch all assessments for a user
@@ -66,7 +69,7 @@ export const fetchAssessmentsForUser = async (userId: string): Promise<Assessmen
     const { data: assessmentsData, error: assessmentsError } = await supabase
       .from('assessments')
       .select('*')
-      .eq('user_id', userId as any)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false });
       
     if (assessmentsError || !assessmentsData) {
@@ -79,10 +82,12 @@ export const fetchAssessmentsForUser = async (userId: string): Promise<Assessmen
     const assessmentsWithQuestions: AssessmentWithQuestions[] = [];
     
     for (const assessment of assessmentsData) {
+      if (!assessment || !assessment.id) continue;
+      
       const { data: questionsData, error: questionsError } = await supabase
         .from('assessment_questions')
         .select('*')
-        .eq('assessment_id', assessment.id as any);
+        .eq('assessment_id', assessment.id);
         
       if (questionsError || !questionsData) {
         console.error('Error fetching questions:', questionsError);
@@ -91,24 +96,24 @@ export const fetchAssessmentsForUser = async (userId: string): Promise<Assessmen
       
       // Fetch images for each question
       const questionsWithImages = await Promise.all(questionsData.map(async (question) => {
-        if (!question) return null;
+        if (!question || !question.id) return null;
         
         const { data: imagesData, error: imagesError } = await supabase
           .from('question_images')
           .select('image_url')
-          .eq('question_id', question.id as any);
+          .eq('question_id', question.id);
           
         if (imagesError || !imagesData) {
           return { 
-            ...question as any, // Using any to bypass spread type error
+            ...question,
             images: [],
             answer: question.answer as 'yes' | 'no' | 'n/a' | null 
           };
         }
         
-        const images = imagesData.map(img => img.image_url);
+        const images = imagesData.map(img => img && img.image_url ? img.image_url : '');
         return { 
-          ...question as any, // Using any to bypass spread type error
+          ...question,
           images, 
           answer: question.answer as 'yes' | 'no' | 'n/a' | null 
         };
@@ -118,7 +123,7 @@ export const fetchAssessmentsForUser = async (userId: string): Promise<Assessmen
       const validQuestions = questionsWithImages.filter(q => q !== null) as AssessmentQuestion[];
       
       assessmentsWithQuestions.push({
-        ...assessment as any, // Using any to bypass spread type error
+        ...assessment,
         questions: validQuestions
       });
     }
@@ -136,7 +141,7 @@ export const loadAssessmentById = async (assessmentId: string): Promise<Assessme
     const { data: assessmentData, error: assessmentError } = await supabase
       .from('assessments')
       .select('*')
-      .eq('id', assessmentId as any)
+      .eq('id', assessmentId)
       .single();
       
     if (assessmentError || !assessmentData) {
@@ -148,7 +153,7 @@ export const loadAssessmentById = async (assessmentId: string): Promise<Assessme
     const { data: questionsData, error: questionsError } = await supabase
       .from('assessment_questions')
       .select('*')
-      .eq('assessment_id', assessmentId as any);
+      .eq('assessment_id', assessmentId);
       
     if (questionsError || !questionsData) {
       console.error('Error loading questions:', questionsError);
@@ -158,24 +163,24 @@ export const loadAssessmentById = async (assessmentId: string): Promise<Assessme
     
     // Fetch images for each question
     const questionsWithImages = await Promise.all(questionsData.map(async (question) => {
-      if (!question) return null;
+      if (!question || !question.id) return null;
       
       const { data: imagesData, error: imagesError } = await supabase
         .from('question_images')
         .select('image_url')
-        .eq('question_id', question.id as any);
+        .eq('question_id', question.id);
         
       if (imagesError || !imagesData) {
         return { 
-          ...question as any, // Using any to bypass spread type error
+          ...question,
           images: [],
           answer: question.answer as 'yes' | 'no' | 'n/a' | null 
         };
       }
       
-      const images = imagesData.map(img => img.image_url || '');
+      const images = imagesData.map(img => img && img.image_url ? img.image_url : '');
       return { 
-        ...question as any, // Using any to bypass spread type error
+        ...question,
         images,
         answer: question.answer as 'yes' | 'no' | 'n/a' | null 
       };
@@ -185,7 +190,7 @@ export const loadAssessmentById = async (assessmentId: string): Promise<Assessme
     const validQuestions = questionsWithImages.filter(q => q !== null) as AssessmentQuestion[];
     
     return {
-      ...assessmentData as any, // Using any to bypass spread type error
+      ...assessmentData,
       questions: validQuestions
     };
   } catch (error) {
@@ -201,14 +206,12 @@ export const updateQuestionInDb = async (
   comment: string | null
 ): Promise<boolean> => {
   try {
-    const updateData: TablesInsert<"assessment_questions"> = { 
-      answer: answer as string | null, 
-      comment 
-    };
-    
     const { error } = await supabase
       .from('assessment_questions')
-      .update(updateData)
+      .update({ 
+        answer: answer as string | null, 
+        comment 
+      })
       .eq('id', questionId);
       
     if (error) {
@@ -227,11 +230,9 @@ export const updateQuestionInDb = async (
 // Complete an assessment
 export const markAssessmentComplete = async (assessmentId: string): Promise<boolean> => {
   try {
-    const updateData: TablesInsert<"assessments"> = { completed: true };
-    
     const { error } = await supabase
       .from('assessments')
-      .update(updateData)
+      .update({ completed: true })
       .eq('id', assessmentId);
       
     if (error) {

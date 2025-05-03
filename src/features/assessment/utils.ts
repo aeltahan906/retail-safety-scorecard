@@ -8,9 +8,12 @@ export const calculateAssessmentResults = (assessment: AssessmentWithQuestions |
     return { totalQuestions: 0, applicableQuestions: 0, yesAnswers: 0, percentage: 0 };
   }
   
-  const totalQuestions = assessment.questions.length;
-  const applicableQuestions = assessment.questions.filter(q => q.answer !== null && q.answer !== 'n/a').length;
-  const yesAnswers = assessment.questions.filter(q => q.answer === 'yes').length;
+  // Filter out questions with invalid data
+  const validQuestions = assessment.questions.filter(q => q && typeof q.question_number === 'number');
+  
+  const totalQuestions = validQuestions.length;
+  const applicableQuestions = validQuestions.filter(q => q.answer !== null && q.answer !== 'n/a').length;
+  const yesAnswers = validQuestions.filter(q => q.answer === 'yes').length;
   
   const percentage = applicableQuestions > 0
     ? Math.round((yesAnswers / applicableQuestions) * 100)

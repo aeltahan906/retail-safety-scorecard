@@ -15,11 +15,26 @@ const AssessmentForm: React.FC = () => {
   }, [currentAssessment, loading]);
   
   if (loading) {
-    return <div className="p-4 text-center">Loading assessment...</div>;
+    return (
+      <div className="p-8 text-center">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-6 w-32 bg-gray-200 mb-4 rounded"></div>
+          <div className="h-40 w-full max-w-md bg-gray-200 rounded mb-4"></div>
+          <div className="h-40 w-full max-w-md bg-gray-200 rounded"></div>
+        </div>
+        <div className="mt-4">Loading assessment...</div>
+      </div>
+    );
   }
   
   if (!currentAssessment) {
-    return <div className="p-4 text-center">No assessment loaded. Please create or select an assessment.</div>;
+    return (
+      <div className="p-8 text-center">
+        <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+          <p className="text-yellow-800">No assessment loaded. Please create or select an assessment.</p>
+        </div>
+      </div>
+    );
   }
   
   // Sort questions by question number
@@ -42,7 +57,7 @@ const AssessmentForm: React.FC = () => {
             questionNumber={question.question_number}
             questionText={question.question_text}
             answer={question.answer}
-            comment={question.comment}
+            comment={question.comment || ""}
             images={question.images || []}
             onUpdate={(answer, comment, images) => 
               handleQuestionUpdate(question.id, answer, comment, images)
