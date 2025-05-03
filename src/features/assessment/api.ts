@@ -53,7 +53,7 @@ export const createQuestionsForAssessment = async (assessmentId: string): Promis
   }
   
   return questionsData.map((q) => ({
-    ...q,
+    ...q as any, // Using any to bypass spread type error
     images: [] as string[],
     answer: q.answer as 'yes' | 'no' | 'n/a' | null
   })) as AssessmentQuestion[];
@@ -66,7 +66,7 @@ export const fetchAssessmentsForUser = async (userId: string): Promise<Assessmen
     const { data: assessmentsData, error: assessmentsError } = await supabase
       .from('assessments')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', userId as any)
       .order('created_at', { ascending: false });
       
     if (assessmentsError || !assessmentsData) {
@@ -82,7 +82,7 @@ export const fetchAssessmentsForUser = async (userId: string): Promise<Assessmen
       const { data: questionsData, error: questionsError } = await supabase
         .from('assessment_questions')
         .select('*')
-        .eq('assessment_id', assessment.id);
+        .eq('assessment_id', assessment.id as any);
         
       if (questionsError || !questionsData) {
         console.error('Error fetching questions:', questionsError);
@@ -96,11 +96,11 @@ export const fetchAssessmentsForUser = async (userId: string): Promise<Assessmen
         const { data: imagesData, error: imagesError } = await supabase
           .from('question_images')
           .select('image_url')
-          .eq('question_id', question.id);
+          .eq('question_id', question.id as any);
           
         if (imagesError || !imagesData) {
           return { 
-            ...question, 
+            ...question as any, // Using any to bypass spread type error
             images: [],
             answer: question.answer as 'yes' | 'no' | 'n/a' | null 
           };
@@ -108,7 +108,7 @@ export const fetchAssessmentsForUser = async (userId: string): Promise<Assessmen
         
         const images = imagesData.map(img => img.image_url);
         return { 
-          ...question, 
+          ...question as any, // Using any to bypass spread type error
           images, 
           answer: question.answer as 'yes' | 'no' | 'n/a' | null 
         };
@@ -118,7 +118,7 @@ export const fetchAssessmentsForUser = async (userId: string): Promise<Assessmen
       const validQuestions = questionsWithImages.filter(q => q !== null) as AssessmentQuestion[];
       
       assessmentsWithQuestions.push({
-        ...assessment,
+        ...assessment as any, // Using any to bypass spread type error
         questions: validQuestions
       });
     }
@@ -136,7 +136,7 @@ export const loadAssessmentById = async (assessmentId: string): Promise<Assessme
     const { data: assessmentData, error: assessmentError } = await supabase
       .from('assessments')
       .select('*')
-      .eq('id', assessmentId)
+      .eq('id', assessmentId as any)
       .single();
       
     if (assessmentError || !assessmentData) {
@@ -148,7 +148,7 @@ export const loadAssessmentById = async (assessmentId: string): Promise<Assessme
     const { data: questionsData, error: questionsError } = await supabase
       .from('assessment_questions')
       .select('*')
-      .eq('assessment_id', assessmentId);
+      .eq('assessment_id', assessmentId as any);
       
     if (questionsError || !questionsData) {
       console.error('Error loading questions:', questionsError);
@@ -163,19 +163,19 @@ export const loadAssessmentById = async (assessmentId: string): Promise<Assessme
       const { data: imagesData, error: imagesError } = await supabase
         .from('question_images')
         .select('image_url')
-        .eq('question_id', question.id);
+        .eq('question_id', question.id as any);
         
       if (imagesError || !imagesData) {
         return { 
-          ...question, 
+          ...question as any, // Using any to bypass spread type error
           images: [],
           answer: question.answer as 'yes' | 'no' | 'n/a' | null 
         };
       }
       
-      const images = imagesData.map(img => img.image_url);
+      const images = imagesData.map(img => img.image_url || '');
       return { 
-        ...question, 
+        ...question as any, // Using any to bypass spread type error
         images,
         answer: question.answer as 'yes' | 'no' | 'n/a' | null 
       };
@@ -185,7 +185,7 @@ export const loadAssessmentById = async (assessmentId: string): Promise<Assessme
     const validQuestions = questionsWithImages.filter(q => q !== null) as AssessmentQuestion[];
     
     return {
-      ...assessmentData,
+      ...assessmentData as any, // Using any to bypass spread type error
       questions: validQuestions
     };
   } catch (error) {
@@ -201,12 +201,14 @@ export const updateQuestionInDb = async (
   comment: string | null
 ): Promise<boolean> => {
   try {
+    const updateData: TablesInsert<"assessment_questions"> = { 
+      answer: answer as string | null, 
+      comment 
+    };
+    
     const { error } = await supabase
       .from('assessment_questions')
-      .update({ 
-        answer: answer as string | null, 
-        comment 
-      } as TablesInsert<"assessment_questions">)
+      .update(updateData)
       .eq('id', questionId);
       
     if (error) {
@@ -225,9 +227,11 @@ export const updateQuestionInDb = async (
 // Complete an assessment
 export const markAssessmentComplete = async (assessmentId: string): Promise<boolean> => {
   try {
+    const updateData: TablesInsert<"assessments"> = { completed: true };
+    
     const { error } = await supabase
       .from('assessments')
-      .update({ completed: true } as TablesInsert<"assessments">)
+      .update(updateData)
       .eq('id', assessmentId);
       
     if (error) {
@@ -277,12 +281,14 @@ export const uploadImageForQuestion = async (
     }
     
     // Save to question_images table
+    const imageData: TablesInsert<"question_images"> = {
+      question_id: questionId,
+      image_url: urlData.publicUrl
+    };
+    
     const { error: saveError } = await supabase
       .from('question_images')
-      .insert({
-        question_id: questionId,
-        image_url: urlData.publicUrl
-      } as TablesInsert<"question_images">);
+      .insert(imageData);
       
     if (saveError) {
       console.error('Error saving image reference:', saveError);

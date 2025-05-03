@@ -39,7 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', userId)
+        .eq('id', userId as any)
         .single();
 
       if (error) {
@@ -74,7 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 id: currentUser.id,
                 email: currentUser.email || '',
                 name: profileData.name,
-                role: profileData.role
+                role: profileData.role as 'admin' | 'user'
               });
             } else {
               setUser({
@@ -84,13 +84,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 role: 'user'
               });
             }
+            setLoading(false);
           }, 0);
         } else {
           setUser(null);
           setProfile(null);
+          setLoading(false);
         }
-        
-        setLoading(false);
       }
     );
 
@@ -109,7 +109,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               id: currentUser.id,
               email: currentUser.email || '',
               name: profileData.name,
-              role: profileData.role
+              role: profileData.role as 'admin' | 'user'
             });
           } else {
             setUser({
