@@ -34,23 +34,31 @@ const Assessment = () => {
   
   // Redirect if not logged in
   useEffect(() => {
-    if (!user) {
-      navigate('/login');
-      return;
+  const fetchAssessment = async () => {
+    try {
+      setLoading(true);
+      // Simulate API call or actual assessment loading logic
+      await loadAssessment(assessmentId);
+    } catch (error) {
+      console.error("Error loading assessment:", error);
+      toast.error("Failed to load assessment. Please try again.");
+    } finally {
+      setLoading(false); // Ensure loading is stopped
     }
-    
-    // Load saved assessments when component mounts
-    fetchAssessments();
-  }, [user, navigate, fetchAssessments]);
+  };
 
-  // Handle store name submission
-  const handleCreateAssessment = async (e: React.FormEvent) => {
-    e.preventDefault();
+  fetchAssessment(); // Call the function
+}, [assessmentId, loadAssessment]);
+
+// Replace the spinner logic with this
+if (loading || !user) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+    </div>
+  );
+}
     
-    if (storeName.trim() === '') {
-      toast.error("Please enter a store name");
-      return;
-    }
     
     setIsCreating(true);
     
