@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Session } from '@supabase/supabase-js';
 import { supabase, getSiteUrl } from "@/integrations/supabase/client";
 import { Profile } from '@/types/database';
+import { TablesRow } from "@/integrations/supabase/types";
 
 // Define types
 export type UserType = {
@@ -39,7 +40,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', userId)
+        .eq('id', userId as any)
         .single();
 
       if (error) {

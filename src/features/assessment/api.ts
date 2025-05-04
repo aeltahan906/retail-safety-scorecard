@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Assessment, AssessmentQuestion } from '@/types/database';
 import { AssessmentWithQuestions } from './types';
 import { DEFAULT_QUESTIONS } from './constants';
-import type { TablesInsert } from '@/integrations/supabase/types';
+import { TablesInsert } from '@/integrations/supabase/types';
 
 // Create a new assessment in the database
 export const createAssessment = async (storeName: string, userId: string): Promise<Assessment | null> => {
@@ -19,7 +19,7 @@ export const createAssessment = async (storeName: string, userId: string): Promi
 
     const { data, error } = await supabase
       .from('assessments')
-      .insert(newAssessment)
+      .insert([newAssessment])
       .select()
       .single();
       
@@ -46,13 +46,13 @@ export const createAssessment = async (storeName: string, userId: string): Promi
 // Create questions for an assessment
 export const createQuestionsForAssessment = async (assessmentId: string): Promise<AssessmentQuestion[] | null> => {
   try {
-    const questionsToInsert = DEFAULT_QUESTIONS.map((q) => ({
+    const questionsToInsert: TablesInsert<"assessment_questions">[] = DEFAULT_QUESTIONS.map((q) => ({
       assessment_id: assessmentId,
       question_number: q.question_number,
       question_text: q.question_text,
       answer: null,
       comment: null
-    } as TablesInsert<"assessment_questions">));
+    }));
     
     const { data: questionsData, error: questionsError } = await supabase
       .from('assessment_questions')
@@ -74,9 +74,15 @@ export const createQuestionsForAssessment = async (assessmentId: string): Promis
     return questionsData.map((q) => {
       if (!q) return null;
       return {
-        ...q,
-        images: [] as string[],
-        answer: q.answer as 'yes' | 'no' | 'n/a' | null
+        id: q.id,
+        assessment_id: q.assessment_id,
+        question_number: q.question_number,
+        question_text: q.question_text,
+        answer: q.answer as 'yes' | 'no' | 'n/a' | null,
+        comment: q.comment,
+        created_at: q.created_at,
+        updated_at: q.updated_at,
+        images: [] as string[]
       };
     }).filter(Boolean) as AssessmentQuestion[];
   } catch (error) {
@@ -93,7 +99,7 @@ export const fetchAssessmentsForUser = async (userId: string): Promise<Assessmen
     const { data: assessmentsData, error: assessmentsError } = await supabase
       .from('assessments')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', userId as any)
       .order('created_at', { ascending: false });
       
     if (assessmentsError) {
@@ -154,7 +160,11 @@ export const fetchAssessmentsForUser = async (userId: string): Promise<Assessmen
           };
         }
         
-        const images = imagesData.map(img => img && img.image_url ? img.image_url : '').filter(Boolean);
+        const images = imagesData
+          .filter(img => img && typeof img === 'object' && 'image_url' in img)
+          .map(img => img.image_url)
+          .filter(Boolean);
+        
         return { 
           ...question,
           images, 
@@ -245,7 +255,11 @@ export const loadAssessmentById = async (assessmentId: string): Promise<Assessme
         };
       }
       
-      const images = imagesData.map(img => img && img.image_url ? img.image_url : '').filter(Boolean);
+      const images = imagesData
+        .filter(img => img && typeof img === 'object' && 'image_url' in img)
+        .map(img => img.image_url)
+        .filter(Boolean);
+      
       return { 
         ...question,
         images, 
@@ -352,14 +366,14 @@ export const uploadImageForQuestion = async (
     }
     
     // Save to question_images table
-    const imageData: TablesInsert<"question_images"> = {
+    const imageData = {
       question_id: questionId,
       image_url: urlData.publicUrl
-    };
+    } as TablesInsert<"question_images">;
     
     const { error: saveError } = await supabase
       .from('question_images')
-      .insert(imageData);
+      .insert([imageData]);
       
     if (saveError) {
       console.error('Error saving image reference:', saveError);

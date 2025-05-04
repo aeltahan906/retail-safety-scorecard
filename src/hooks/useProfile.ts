@@ -48,7 +48,7 @@ export function useProfile() {
         const { data, error: profileError } = await supabase
           .from("profiles")
           .select("*")
-          .eq("id", user.id)
+          .eq("id", user.id as any)
           .single();
 
         if (profileError) {
