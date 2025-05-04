@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from "sonner";
 import { Session } from '@supabase/supabase-js';
-import { supabase, getSiteUrl } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import { Profile } from '@/types/database';
 import { Tables } from "@/integrations/supabase/types";
 
@@ -95,13 +95,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Check for existing session on component mount
   useEffect(() => {
+    console.log("AuthProvider initialized");
+    
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
+      console.log("Auth state changed:", event);
       handleSessionChange(currentSession);
     });
 
     // Fetch initial session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      console.log("Initial session check:", currentSession ? "Session found" : "No session");
       handleSessionChange(currentSession);
     });
 
@@ -202,19 +206,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const contextValue: AuthContextType = {
+    user,
+    session,
+    profile,
+    signUp,
+    signIn,
+    signOut,
+    resetPassword,
+    loading,
+  };
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        session,
-        profile,
-        signUp,
-        signIn,
-        signOut,
-        resetPassword,
-        loading,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

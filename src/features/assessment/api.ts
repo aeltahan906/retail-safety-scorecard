@@ -10,12 +10,12 @@ import { TablesInsert } from '@/integrations/supabase/types';
 // Create a new assessment in the database
 export const createAssessment = async (storeName: string, userId: string): Promise<Assessment | null> => {
   try {
-    const newAssessment: TablesInsert<"assessments"> = {
+    const newAssessment = {
       store_name: storeName,
       user_id: userId,
       date: new Date().toISOString(),
       completed: false
-    };
+    } as TablesInsert<"assessments">;
 
     const { data, error } = await supabase
       .from('assessments')
@@ -25,12 +25,6 @@ export const createAssessment = async (storeName: string, userId: string): Promi
       
     if (error) {
       console.error('Error creating assessment:', error);
-      toast.error('Failed to create assessment');
-      return null;
-    }
-    
-    if (!data) {
-      console.error('No data returned after creating assessment');
       toast.error('Failed to create assessment');
       return null;
     }
@@ -46,13 +40,13 @@ export const createAssessment = async (storeName: string, userId: string): Promi
 // Create questions for an assessment
 export const createQuestionsForAssessment = async (assessmentId: string): Promise<AssessmentQuestion[] | null> => {
   try {
-    const questionsToInsert: TablesInsert<"assessment_questions">[] = DEFAULT_QUESTIONS.map((q) => ({
+    const questionsToInsert = DEFAULT_QUESTIONS.map((q) => ({
       assessment_id: assessmentId,
       question_number: q.question_number,
       question_text: q.question_text,
       answer: null,
       comment: null
-    }));
+    } as TablesInsert<"assessment_questions">));
     
     const { data: questionsData, error: questionsError } = await supabase
       .from('assessment_questions')
@@ -71,20 +65,25 @@ export const createQuestionsForAssessment = async (assessmentId: string): Promis
       return null;
     }
     
-    return questionsData.map((q) => {
-      if (!q) return null;
-      return {
-        id: q.id,
-        assessment_id: q.assessment_id,
-        question_number: q.question_number,
-        question_text: q.question_text,
-        answer: q.answer as 'yes' | 'no' | 'n/a' | null,
-        comment: q.comment,
-        created_at: q.created_at,
-        updated_at: q.updated_at,
-        images: [] as string[]
-      };
-    }).filter((q): q is AssessmentQuestion => q !== null);
+    const formattedQuestions: AssessmentQuestion[] = [];
+    
+    for (const question of questionsData) {
+      if (!question) continue;
+      
+      formattedQuestions.push({
+        id: question.id,
+        assessment_id: question.assessment_id,
+        question_number: question.question_number,
+        question_text: question.question_text,
+        answer: question.answer as 'yes' | 'no' | 'n/a' | null,
+        comment: question.comment,
+        created_at: question.created_at,
+        updated_at: question.updated_at,
+        images: []
+      });
+    }
+    
+    return formattedQuestions;
   } catch (error) {
     console.error('Exception in createQuestionsForAssessment:', error);
     toast.error('An unexpected error occurred while creating assessment questions.');
@@ -147,7 +146,7 @@ export const fetchAssessmentsForUser = async (userId: string): Promise<Assessmen
           console.error('Error fetching images for question:', question.id, imagesError);
           return { 
             ...question,
-            images: [],
+            images: [] as string[],
             answer: question.answer as 'yes' | 'no' | 'n/a' | null 
           };
         }
@@ -155,7 +154,7 @@ export const fetchAssessmentsForUser = async (userId: string): Promise<Assessmen
         if (!imagesData) {
           return { 
             ...question,
-            images: [],
+            images: [] as string[],
             answer: question.answer as 'yes' | 'no' | 'n/a' | null 
           };
         }
@@ -163,7 +162,7 @@ export const fetchAssessmentsForUser = async (userId: string): Promise<Assessmen
         const images = imagesData
           .filter(img => img && typeof img === 'object' && 'image_url' in img)
           .map(img => img.image_url)
-          .filter(Boolean);
+          .filter(Boolean) as string[];
         
         return { 
           ...question,
@@ -178,7 +177,7 @@ export const fetchAssessmentsForUser = async (userId: string): Promise<Assessmen
       assessmentsWithQuestions.push({
         ...assessment,
         questions: validQuestions
-      });
+      } as AssessmentWithQuestions);
     }
     
     return assessmentsWithQuestions;
@@ -226,7 +225,7 @@ export const loadAssessmentById = async (assessmentId: string): Promise<Assessme
       return {
         ...assessmentData,
         questions: []
-      };
+      } as AssessmentWithQuestions;
     }
     
     // Fetch images for each question
@@ -242,7 +241,7 @@ export const loadAssessmentById = async (assessmentId: string): Promise<Assessme
         console.error('Error fetching images for question:', question.id, imagesError);
         return { 
           ...question,
-          images: [],
+          images: [] as string[],
           answer: question.answer as 'yes' | 'no' | 'n/a' | null 
         };
       }
@@ -250,7 +249,7 @@ export const loadAssessmentById = async (assessmentId: string): Promise<Assessme
       if (!imagesData) {
         return { 
           ...question,
-          images: [],
+          images: [] as string[],
           answer: question.answer as 'yes' | 'no' | 'n/a' | null 
         };
       }
@@ -258,7 +257,7 @@ export const loadAssessmentById = async (assessmentId: string): Promise<Assessme
       const images = imagesData
         .filter(img => img && typeof img === 'object' && 'image_url' in img)
         .map(img => img.image_url)
-        .filter(Boolean);
+        .filter(Boolean) as string[];
       
       return { 
         ...question,
@@ -273,7 +272,7 @@ export const loadAssessmentById = async (assessmentId: string): Promise<Assessme
     return {
       ...assessmentData,
       questions: validQuestions
-    };
+    } as AssessmentWithQuestions;
   } catch (error) {
     console.error('Error in loadAssessment:', error);
     toast.error('An unexpected error occurred while loading the assessment.');
