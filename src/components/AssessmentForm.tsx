@@ -9,8 +9,7 @@ const AssessmentForm: React.FC = () => {
   
   useEffect(() => {
     if (!currentAssessment && !loading) {
-      console.error("No assessment loaded, but loading is complete");
-      toast.error("Failed to load assessment data");
+      console.log("No assessment loaded, but loading is complete");
     }
   }, [currentAssessment, loading]);
   
@@ -44,7 +43,7 @@ const AssessmentForm: React.FC = () => {
   
   // Handler for when a question is updated
   const handleQuestionUpdate = (questionId: string, answer: 'yes' | 'no' | 'n/a' | null, comment: string, images: string[]) => {
-    updateQuestion(questionId, answer, comment, images);
+    updateQuestion(questionId, answer, comment || null, images);
   };
   
   return (

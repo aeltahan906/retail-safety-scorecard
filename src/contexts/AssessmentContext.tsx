@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
@@ -23,6 +24,7 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
   const [currentAssessment, setCurrentAssessment] = useState<AssessmentWithQuestions | null>(null);
   const [savedAssessments, setSavedAssessments] = useState<AssessmentWithQuestions[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   
   // Create a new assessment with default questions
@@ -34,6 +36,7 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
     
     try {
       setLoading(true); // Indicate loading state
+      setError(null);
 
       // Create the assessment
       const assessment = await createAssessment(storeName, user.id);
@@ -43,25 +46,34 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       
+      console.log("Created assessment:", assessment);
+      
       // Create questions for the assessment
       const questions = await createQuestionsForAssessment(assessment.id);
       
       if (!questions) {
         toast.error('Failed to create assessment questions. Rolling back assessment creation.');
-        // Rollback: Delete the created assessment if questions fail
-        // (Assuming there's a deleteAssessment API available)
+        // Rollback logic would go here
         return;
       }
       
+      console.log("Created questions:", questions.length);
+      
       // Set as current assessment
-      setCurrentAssessment({
+      const newAssessment: AssessmentWithQuestions = {
         ...assessment,
         questions
-      });
+      };
+      
+      setCurrentAssessment(newAssessment);
+      
+      // Add to saved assessments list
+      setSavedAssessments(prev => [newAssessment, ...prev]);
       
       toast.success('Assessment created successfully');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in createNewAssessment:', error);
+      setError(error.message || 'An unexpected error occurred');
       toast.error('An unexpected error occurred while creating the assessment.');
     } finally {
       setLoading(false); // End loading state
@@ -71,18 +83,23 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
   // Fetch all assessments for the current user
   const fetchAssessments = async () => {
     if (!user) {
-      toast.error('User is not logged in. Unable to fetch assessments.');
+      console.log('User is not logged in. Unable to fetch assessments.');
       setLoading(false);
+      setError('User not logged in');
       return;
     }
     
     setLoading(true);
+    setError(null);
     
     try {
+      console.log("Fetching assessments for user:", user.id);
       const assessmentsData = await fetchAssessmentsForUser(user.id);
+      console.log("Fetched assessments:", assessmentsData.length);
       setSavedAssessments(assessmentsData);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in fetchAssessments:', error);
+      setError(error.message || 'Failed to fetch assessments');
       toast.error('Failed to fetch assessments. Please check your network connection.');
     } finally {
       setLoading(false);
@@ -96,18 +113,28 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
+    setLoading(true);
+    setError(null);
+
     try {
+      console.log("Loading assessment:", assessmentId);
       const assessment = await loadAssessmentById(assessmentId);
       
       if (assessment) {
+        console.log("Assessment loaded successfully:", assessment.id);
         setCurrentAssessment(assessment);
         toast.success('Assessment loaded successfully');
       } else {
+        console.error("Failed to load assessment:", assessmentId);
+        setError('Failed to load assessment');
         toast.error('Failed to load assessment. Please try again.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in loadAssessment:', error);
+      setError(error.message || 'Failed to load assessment');
       toast.error('An error occurred while loading the assessment.');
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -132,10 +159,12 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
       // Update database
       const success = await updateQuestionInDb(questionId, answer, comment);
       if (!success) {
+        console.error("Failed to update question in database:", questionId);
         throw new Error('Database update failed');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in updateQuestion:', error);
+      setError(error.message || 'Failed to save question');
       toast.error('Failed to save the question update. Please try again.');
     }
   };
@@ -156,12 +185,21 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
           completed: true
         });
         
+        // Update in the saved assessments list
+        setSavedAssessments(prevAssessments => 
+          prevAssessments.map(a => 
+            a.id === currentAssessment.id ? { ...a, completed: true } : a
+          )
+        );
+        
         toast.success('Assessment completed successfully');
       } else {
+        setError('Failed to mark assessment as complete');
         toast.error('Failed to mark the assessment as complete.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in completeAssessment:', error);
+      setError(error.message || 'Failed to complete assessment');
       toast.error('An unexpected error occurred while completing the assessment.');
     }
   };
@@ -190,15 +228,17 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
       } else {
         throw new Error('Image upload failed');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in uploadImage:', error);
+      setError(error.message || 'Failed to upload image');
       toast.error('Failed to upload the image. Please try again.');
       return null;
     }
   };
   
-  // Effect to fetch assessments when user changes
+  // Effect to fetch assessments when user changes or when logged in
   useEffect(() => {
+    console.log("AssessmentContext useEffect triggered - User:", user?.id);
     if (user) {
       fetchAssessments();
     } else {
@@ -207,6 +247,13 @@ export const AssessmentProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     }
   }, [user]);
+
+  // Debug log when component renders
+  useEffect(() => {
+    console.log("AssessmentContext rendered - Loading:", loading, "User:", user?.id);
+    console.log("Current assessment:", currentAssessment?.id);
+    console.log("Saved assessments:", savedAssessments.length);
+  }, [loading, user, currentAssessment, savedAssessments.length]);
 
   return (
     <AssessmentContext.Provider value={{ 
