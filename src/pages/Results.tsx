@@ -57,6 +57,12 @@ const Results = () => {
     fetchAssessment();
   }, [location.search, currentAssessment, loadAssessment, calculateResults]);
 
+  // Add timeout fallback to avoid infinite loading
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 10000); // Timeout after 10 seconds
+    return () => clearTimeout(timer); // Cleanup timer on component unmount
+  }, []);
+
   // Update local state when currentAssessment changes
   useEffect(() => {
     if (currentAssessment) {
