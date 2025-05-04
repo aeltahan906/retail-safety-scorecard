@@ -44,7 +44,7 @@ const AssessmentForm: React.FC = () => {
   // Handler for when a question is updated
   const handleQuestionUpdate = (questionId: string, answer: 'yes' | 'no' | 'n/a' | null, comment: string, images: string[]) => {
     try {
-      updateQuestion(questionId, answer, comment || null, images);
+      updateQuestion(questionId, answer, comment || "", images);
     } catch (error) {
       console.error("Error updating question:", error);
       toast.error("Failed to update question. Please try again.");

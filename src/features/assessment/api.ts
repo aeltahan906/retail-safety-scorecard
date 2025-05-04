@@ -19,7 +19,7 @@ export const createAssessment = async (storeName: string, userId: string): Promi
 
     const { data, error } = await supabase
       .from('assessments')
-      .insert([newAssessment])
+      .insert(newAssessment)
       .select()
       .single();
       
@@ -84,7 +84,7 @@ export const createQuestionsForAssessment = async (assessmentId: string): Promis
         updated_at: q.updated_at,
         images: [] as string[]
       };
-    }).filter(Boolean) as AssessmentQuestion[];
+    }).filter((q): q is AssessmentQuestion => q !== null);
   } catch (error) {
     console.error('Exception in createQuestionsForAssessment:', error);
     toast.error('An unexpected error occurred while creating assessment questions.');
@@ -99,7 +99,7 @@ export const fetchAssessmentsForUser = async (userId: string): Promise<Assessmen
     const { data: assessmentsData, error: assessmentsError } = await supabase
       .from('assessments')
       .select('*')
-      .eq('user_id', userId as any)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false });
       
     if (assessmentsError) {
@@ -108,8 +108,8 @@ export const fetchAssessmentsForUser = async (userId: string): Promise<Assessmen
       return [];
     }
     
-    if (!assessmentsData) {
-      console.error('No assessments found for user:', userId);
+    if (!assessmentsData || assessmentsData.length === 0) {
+      console.log('No assessments found for user:', userId);
       return [];
     }
     
@@ -129,8 +129,8 @@ export const fetchAssessmentsForUser = async (userId: string): Promise<Assessmen
         continue;
       }
       
-      if (!questionsData) {
-        console.error('No questions found for assessment:', assessment.id);
+      if (!questionsData || questionsData.length === 0) {
+        console.log('No questions found for assessment:', assessment.id);
         continue;
       }
       
@@ -173,7 +173,7 @@ export const fetchAssessmentsForUser = async (userId: string): Promise<Assessmen
       }));
       
       // Filter out any null questions
-      const validQuestions = questionsWithImages.filter(q => q !== null) as AssessmentQuestion[];
+      const validQuestions = questionsWithImages.filter((q): q is AssessmentQuestion => q !== null);
       
       assessmentsWithQuestions.push({
         ...assessment,
@@ -221,8 +221,8 @@ export const loadAssessmentById = async (assessmentId: string): Promise<Assessme
       return null;
     }
     
-    if (!questionsData) {
-      console.error('No questions found for assessment:', assessmentId);
+    if (!questionsData || questionsData.length === 0) {
+      console.warn('No questions found for assessment:', assessmentId);
       return {
         ...assessmentData,
         questions: []
@@ -268,7 +268,7 @@ export const loadAssessmentById = async (assessmentId: string): Promise<Assessme
     }));
     
     // Filter out any null questions
-    const validQuestions = questionsWithImages.filter(q => q !== null) as AssessmentQuestion[];
+    const validQuestions = questionsWithImages.filter((q): q is AssessmentQuestion => q !== null);
     
     return {
       ...assessmentData,
@@ -373,7 +373,7 @@ export const uploadImageForQuestion = async (
     
     const { error: saveError } = await supabase
       .from('question_images')
-      .insert([imageData]);
+      .insert(imageData);
       
     if (saveError) {
       console.error('Error saving image reference:', saveError);

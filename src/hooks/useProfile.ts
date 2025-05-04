@@ -17,6 +17,7 @@ export function useProfile() {
         
         if (sessionError) {
           console.error("Session fetch error:", sessionError);
+          setError(sessionError);
           setLoading(false);
           return;
         }
@@ -48,7 +49,7 @@ export function useProfile() {
         const { data, error: profileError } = await supabase
           .from("profiles")
           .select("*")
-          .eq("id", user.id as any)
+          .eq("id", user.id)
           .single();
 
         if (profileError) {
