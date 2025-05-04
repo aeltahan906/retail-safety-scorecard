@@ -8,29 +8,34 @@ const Index = () => {
   const navigate = useNavigate();
   
   useEffect(() => {
-    console.log("Index page - Auth state:", { user, loading });
-    
-    if (!loading) {
-      if (user) {
-        navigate("/assessment", { replace: true });
-      } else {
-        navigate("/login", { replace: true });
+  const checkAuthState = async () => {
+    try {
+      console.log("Index page - Auth state:", { user, loading });
+
+      if (!loading) {
+        if (user) {
+          navigate("/assessment", { replace: true });
+        } else {
+          navigate("/login", { replace: true });
+        }
       }
+    } catch (error) {
+      console.error("Authentication error:", error);
+      toast.error("Authentication failed. Please reload the page.");
     }
-  }, [user, loading, navigate]);
-  
-  // Show a loading indicator while determining auth state
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-        <div className="ml-4">Checking authentication...</div>
-      </div>
-    );
-  }
-  
-  // This is a fallback in case the useEffect navigation doesn't trigger
-  return user ? <Navigate to="/assessment" replace /> : <Navigate to="/login" replace />;
-};
+  };
+
+  checkAuthState();
+}, [user, loading, navigate]);
+
+// Updated spinner logic
+if (loading) {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      <div className="ml-4">Checking authentication...</div>
+    </div>
+  );
+}
 
 export default Index;
