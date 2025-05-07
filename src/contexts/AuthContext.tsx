@@ -5,6 +5,7 @@ import { Session } from '@supabase/supabase-js';
 import { supabase } from "@/integrations/supabase/client";
 import { Profile } from '@/types/database';
 import { Tables } from "@/integrations/supabase/types";
+import { getSiteUrl } from "@/integrations/supabase/client";
 
 // Define types
 export type UserType = {

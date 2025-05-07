@@ -1,7 +1,8 @@
+
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { toast } from "react-toastify"; // Ensure toast is imported if this is being used
+import { toast } from "sonner";
 
 const Index = () => {
   const { user, loading } = useAuth();
