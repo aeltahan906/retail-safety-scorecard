@@ -34,31 +34,39 @@ const Assessment = () => {
   
   // Redirect if not logged in
   useEffect(() => {
-  const fetchAssessment = async () => {
-    try {
-      setLoading(true);
-      // Simulate API call or actual assessment loading logic
-      await loadAssessment(assessmentId);
-    } catch (error) {
-      console.error("Error loading assessment:", error);
-      toast.error("Failed to load assessment. Please try again.");
-    } finally {
-      setLoading(false); // Ensure loading is stopped
-    }
-  };
+    const fetchAssessment = async () => {
+      try {
+        setLoading(true);
+        // Simulate API call or actual assessment loading logic
+        await loadAssessment(assessmentId);
+      } catch (error) {
+        console.error("Error loading assessment:", error);
+        toast.error("Failed to load assessment. Please try again.");
+      } finally {
+        setLoading(false); // Ensure loading is stopped
+      }
+    };
 
-  fetchAssessment(); // Call the function
-}, [assessmentId, loadAssessment]);
+    fetchAssessment(); // Call the function
+  }, [assessmentId, loadAssessment]);
 
-// Replace the spinner logic with this
-if (loading || !user) {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-    </div>
-  );
-}
+  // Replace the spinner logic with this
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+  
+  // Handle form submission for creating a new assessment
+  const handleCreateAssessment = async (e: React.FormEvent) => {
+    e.preventDefault();
     
+    if (!storeName.trim()) {
+      toast.error("Please enter a store name");
+      return;
+    }
     
     setIsCreating(true);
     
