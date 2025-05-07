@@ -12,7 +12,7 @@ const Assessment = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // We need to make the handleCreateAssessment function async
+  // Make sure the function is async
   const handleCreateAssessment = async (e: React.FormEvent) => {
     e.preventDefault();
     

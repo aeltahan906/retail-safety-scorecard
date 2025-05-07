@@ -1,24 +1,46 @@
 
 import { createClient } from '@supabase/supabase-js';
-import type { Database } from './types';
+import { toast } from "sonner";
 
-// Use environment variables if available, fallback to hardcoded values for development
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://ibhglktotlqvfdnotxxp.supabase.co";
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImliaGdsa3RvdGxxdmZkbm90eHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYwMTk2ODgsImV4cCI6MjA2MTU5NTY4OH0.bfeOsTuShbqrYhuXLe4t_BUj7IPU8S8s44Z9AkJlatw";
+// Get environment variables
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Helper function to determine the current site URL
-export const getSiteUrl = () => {
-  // Get the current URL
-  const url = window.location.origin;
-  return url;
+// Ensure the environment variables are set
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error(
+    "Supabase URL or Anonymous Key is missing. Make sure you have set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your environment."
+  );
+  
+  // For development, you might want to use default values
+  if (import.meta.env.DEV) {
+    console.warn("Using placeholder values for development purposes only.");
+  }
+}
+
+// Create the Supabase client
+export const supabase = createClient(
+  supabaseUrl || '',
+  supabaseAnonKey || '',
+  {
+    auth: {
+      persistSession: true,
+      detectSessionInUrl: true,
+      // Removed redirectTo as it's not supported in the current API version
+    },
+  }
+);
+
+// Add a helper method to handle auth state changes
+export const setupAuthListener = (callback: (event: string, session: any) => void) => {
+  return supabase.auth.onAuthStateChange((event, session) => {
+    callback(event, session);
+  });
 };
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-    flowType: 'pkce',
-    redirectTo: getSiteUrl()
-  }
-});
+// Export a function to handle errors gracefully
+export const handleSupabaseError = (error: any, customMessage?: string) => {
+  console.error('Supabase error:', error);
+  toast.error(customMessage || 'An error occurred');
+  return null;
+};

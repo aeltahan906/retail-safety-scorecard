@@ -1,5 +1,28 @@
-
 // Default questions for a new assessment
+export const DEFAULT_ASSESSMENT_QUESTIONS = [
+  "Are all fire extinguishers properly maintained and accessible?",
+  "Is the emergency evacuation plan clearly displayed?",
+  "Are all emergency exits properly marked and unobstructed?",
+  "Is proper PPE available and used where required?",
+  "Are all hazardous materials properly labeled and stored?",
+  "Is the first aid kit fully stocked and easily accessible?",
+  "Are all electrical panels and equipment in good condition?",
+  "Are all walkways and work areas free of slip, trip, and fall hazards?",
+  "Is the lighting adequate in all work areas?",
+  "Are all employees trained in safety procedures?",
+  "Are safety data sheets (SDS) available for all chemicals?",
+  "Is proper lifting technique being followed for manual handling?",
+  "Are all tools and machinery properly maintained?",
+  "Is there adequate ventilation in work areas?",
+  "Are noise levels controlled where necessary?",
+  "Are COVID-19 safety measures being followed?",
+  "Are all safety signs visible and in good condition?",
+  "Are regular safety meetings conducted?",
+  "Is there a process for reporting safety concerns?",
+  "Are safety inspections conducted regularly?"
+];
+
+// Keep the DEFAULT_QUESTIONS export for backward compatibility
 export const DEFAULT_QUESTIONS = [
   { question_number: 1, question_text: "Are all fire extinguishers properly maintained and accessible?" },
   { question_number: 2, question_text: "Is the emergency evacuation plan clearly displayed?" },
