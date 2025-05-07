@@ -1,21 +1,20 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 import { Assessment, AssessmentQuestion } from '@/types/database';
 import { AssessmentWithQuestions } from './types';
 import { DEFAULT_QUESTIONS } from './constants';
-import { TablesInsert } from '@/integrations/supabase/types';
+import { Database, Tables, TablesInsert } from '@/integrations/supabase/types';
 
 // Create a new assessment in the database
 export const createAssessment = async (storeName: string, userId: string): Promise<Assessment | null> => {
   try {
-    const newAssessment = {
+    const newAssessment: TablesInsert<"assessments"> = {
       store_name: storeName,
       user_id: userId,
       date: new Date().toISOString(),
       completed: false
-    } as TablesInsert<"assessments">;
+    };
 
     const { data, error } = await supabase
       .from('assessments')
@@ -40,13 +39,13 @@ export const createAssessment = async (storeName: string, userId: string): Promi
 // Create questions for an assessment
 export const createQuestionsForAssessment = async (assessmentId: string): Promise<AssessmentQuestion[] | null> => {
   try {
-    const questionsToInsert = DEFAULT_QUESTIONS.map((q) => ({
+    const questionsToInsert: TablesInsert<"assessment_questions">[] = DEFAULT_QUESTIONS.map((q) => ({
       assessment_id: assessmentId,
       question_number: q.question_number,
       question_text: q.question_text,
       answer: null,
       comment: null
-    } as TablesInsert<"assessment_questions">));
+    }));
     
     const { data: questionsData, error: questionsError } = await supabase
       .from('assessment_questions')
@@ -68,8 +67,6 @@ export const createQuestionsForAssessment = async (assessmentId: string): Promis
     const formattedQuestions: AssessmentQuestion[] = [];
     
     for (const question of questionsData) {
-      if (!question) continue;
-      
       formattedQuestions.push({
         id: question.id,
         assessment_id: question.assessment_id,
@@ -365,10 +362,10 @@ export const uploadImageForQuestion = async (
     }
     
     // Save to question_images table
-    const imageData = {
+    const imageData: TablesInsert<"question_images"> = {
       question_id: questionId,
       image_url: urlData.publicUrl
-    } as TablesInsert<"question_images">;
+    };
     
     const { error: saveError } = await supabase
       .from('question_images')
